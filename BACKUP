@@ -1,0 +1,75 @@
+import argparse
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--source", required=True,type=Path)
+parser.add_argument("--destination", required=True,type=Path)
+parser.add_argument("--days", type=int, default=7)
+parser.add_argument("--dry-run", action ="store_true")
+args = parser.parse_args()
+
+if not args.source.is_dir():
+    parser.error("--source must be an existing directory")
+
+if not 1 <= args.days <= 365:
+    parser.error("--days must be from 1 to 365")
+
+# Prepare destination and log file
+args.destination.mkdir(parents=True, exist_ok=True)
+log_path = args.destination / "backup.log"
+
+
+def write_log(message):
+    line = f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}"
+
+    print(line)
+
+    with log_path.open("a", encoding="utf-8") as log:
+        log.write(line + "\n")
+
+
+try:
+    target = args.destination / (
+        f"backup_{datetime.now():%Y%m%d_%H%M%S}"
+    )
+
+    cutoff = datetime.now() - timedelta(days=args.days)
+
+    files = [
+        item for item in args.source.iterdir()
+        if item.is_file()
+        and datetime.fromtimestamp(
+            item.stat().st_mtime
+        ) > cutoff
+    ]
+
+    write_log(
+        f"Start. Source={args.source} "
+        f"Days={args.days} DryRun={args.dry_run} "
+        f"Found={len(files)}"
+    )
+
+    if not files:
+        write_log("Nothing to back up.")
+
+    else:
+        if not args.dry_run:
+            target.mkdir(parents=True, exist_ok=True)
+
+        for item in files:
+
+            if args.dry_run:
+                write_log(f"DRY RUN: Would copy {item.name}")
+
+            else:
+                shutil.copy2(item, target / item.name)
+                write_log(f"Copied {item.name}")
+
+        write_log("Backup completed.")
+
+except OSError as error:
+    write_log(f"ERROR: {error}")
+    raise SystemExit(1)
+raise SystemExit(0) 
