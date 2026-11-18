@@ -1,0 +1,10 @@
+from pathlib import Path
+import os
+import time
+
+p = Path("LabDataOld/old2.txt")
+
+p.touch()
+
+old_time = time.time() - (30 * 86400)
+os.utime(p, (old_time, old_time))
